@@ -10,10 +10,6 @@
       "description": "Pyrogram session string",
       "required": true
     },
-    "BOT_TOKEN": {
-      "description": "A bot token from @BotFather",
-      "required": true
-    },
     "API_ID": {
       "description": "API_ID from my.telegram.org/apps",
       "required": true
