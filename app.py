@@ -22,78 +22,41 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+# Modified by Tinura Dinith
+# Removed bot parts
+
 import os
-import glob
 import json
-import logging
 import asyncio
 import youtube_dl
-from pytgcalls import StreamType
 from pytube import YouTube
+from pyrogram import Client, filters
 from youtube_search import YoutubeSearch
-from pytgcalls import PyTgCalls, idle
+from pytgcalls import PyTgCalls, idle, StreamType
 from pytgcalls.types import Update
 from pyrogram.raw.base import Update
-from pytgcalls.types import AudioPiped, AudioVideoPiped
-from pytgcalls.types import (
-    HighQualityAudio,
-    HighQualityVideo,
-    LowQualityVideo,
-    MediumQualityVideo
-)
-from pytgcalls.types.stream import StreamAudioEnded, StreamVideoEnded
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQuery
-from helpers.queues import QUEUE, add_to_queue, get_queue, clear_queue, pop_an_item
-from helpers.admin_check import *
+from pytgcalls.types import (AudioPiped, AudioVideoPiped, HighQualityAudio, 
+                      HighQualityVideo, LowQualityVideo, MediumQualityVideo)
+from pytgcalls.types.stream import StreamAudioEnded
+from helpers import QUEUE, add_to_queue, get_queue, clear_queue, pop_an_item, is_admin
 
-bot = Client(
-    "Music Stream Bot",
-    bot_token = os.environ["BOT_TOKEN"],
-    api_id = int(os.environ["API_ID"]),
-    api_hash = os.environ["API_HASH"]
-)
+# Config
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+SESSION = os.getenv("SESSION")
+OWNER = os.getenv("OWNER_ID")
+OWNER_ID = [int(x) for x in OWNER.split()]
 
-client = Client(os.environ["SESSION_NAME"], int(os.environ["API_ID"]), os.environ["API_HASH"])
-
-app = PyTgCalls(client)
-
-OWNER_ID = int(os.environ["OWNER_ID"])
-
+bot = Client(SESSION, API_ID, API_HASH)
+app = PyTgCalls(bot)
 LIVE_CHATS = []
 
 START_TEXT = """
 Hi <b>{}</b> 👋
-
 I can play music & stream videos in Telegram group voice chats. 
-
 Make your own bot using below source code.
 """
 
-START_BUTTONS = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("📨 Support", url="https://t.me/JaguarBots"),
-            InlineKeyboardButton("📚 Source Code", url="https://github.com/ImJanindu/47MusicPlayerBot")
-        ]
-    ]
-)
-
-BUTTONS = InlineKeyboardMarkup(
-    [
-        [
-            InlineKeyboardButton("⏸", callback_data="pause"),
-            InlineKeyboardButton("▶️", callback_data="resume"),
-            InlineKeyboardButton("⏭", callback_data="skip"),
-            InlineKeyboardButton("⏹", callback_data="stop"),
-            InlineKeyboardButton("🔇", callback_data="mute"),
-            InlineKeyboardButton("🔊", callback_data="unmute")
-        ],
-        [
-            InlineKeyboardButton("🗑 Close Menu", callback_data="close")
-        ]
-    ]
-)
 
 async def skip_current_song(chat_id):
     if chat_id in QUEUE:
@@ -131,8 +94,7 @@ async def skip_current_song(chat_id):
                 )
             pop_an_item(chat_id)
             await bot.send_photo(chat_id, photo = thumb,
-                                 caption = f"▶️ <b>Now playing:</b> [{title}]({link}) | `{type}` \n\n⏳ <b>Duration:</b> {duration}",
-                                 reply_markup = BUTTONS)
+                                 caption = f"▶️ <b>Now playing:</b> [{title}]({link}) | `{type}` \n\n⏳ <b>Duration:</b> {duration}")
             return [title, link, type, duration, thumb]
     else:
         return 0
@@ -200,83 +162,15 @@ async def yt_audio(link):
         return 0, stderr.decode()
 
 
-@bot.on_callback_query()
-async def callbacks(_, cq: CallbackQuery):
-    user_id = cq.from_user.id
-    try:
-        user = await cq.message.chat.get_member(user_id)
-        admin_strings = ("creator", "administrator")
-        if user.status not in admin_strings:
-            is_admin = False
-        else:
-            is_admin = True
-    except ValueError:
-        is_admin = True        
-    if not is_admin:
-        return await cq.answer("You aren't an admin.")   
-    chat_id = cq.message.chat.id
-    data = cq.data
-    if data == "close":
-        return await cq.message.delete()
-    if not chat_id in QUEUE:
-        return await cq.answer("Nothing is playing.")
-
-    if data == "pause":
-        try:
-            await app.pause_stream(chat_id)
-            await cq.answer("Paused streaming.")
-        except:
-            await cq.answer("Nothing is playing.")
-      
-    elif data == "resume":
-        try:
-            await app.resume_stream(chat_id)
-            await cq.answer("Resumed streaming.")
-        except:
-            await cq.answer("Nothing is playing.")   
-
-    elif data == "stop":
-        await app.leave_group_call(chat_id)
-        clear_queue(chat_id)
-        await cq.answer("Stopped streaming.")  
-
-    elif data == "mute":
-        try:
-            await app.mute_stream(chat_id)
-            await cq.answer("Muted streaming.")
-        except:
-            await cq.answer("Nothing is playing.")
-            
-    elif data == "unmute":
-        try:
-            await app.unmute_stream(chat_id)
-            await cq.answer("Unmuted streaming.")
-        except:
-            await cq.answer("Nothing is playing.")
-            
-    elif data == "skip":
-        op = await skip_current_song(chat_id)
-        if op == 0:
-            await cq.answer("Nothing in the queue to skip.")
-        elif op == 1:
-            await cq.answer("Empty queue, stopped streaming.")
-        else:
-            await cq.answer("Skipped.")
             
 
-@bot.on_message(filters.command("start") & filters.private)
+@bot.on_message(filters.command("start", prefixes=".") & (filters.outgoing|filters.user(OWNER_ID)))
 async def start_private(_, message):
     msg = START_TEXT.format(message.from_user.mention)
-    await message.reply_text(text = msg,
-                             reply_markup = START_BUTTONS)
-    
-
-@bot.on_message(filters.command("start") & filters.group)
-async def start_group(_, message):
-    await message.reply_text("🎧 <i>Music player is running.</i>")
+    await message.reply_text(text = msg)
     
     
-@bot.on_message(filters.command(["play", "vplay"]) & filters.group)
+@bot.on_message(filters.command(["play", "vplay"] ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 async def video_play(_, message):
     await message.delete()
     user_id = message.from_user.id
@@ -340,13 +234,13 @@ async def video_play(_, message):
                 stream_type=StreamType().pulse_stream
             )
             add_to_queue(chat_id, yt.title, duration, link, playlink, doom, Q, thumb)
-            await message.reply_photo(thumb, caption=cap, reply_markup=BUTTONS)
+            await message.reply_photo(thumb, caption=cap)
             await m.delete()
     except Exception as e:
         return await m.edit(str(e))
     
     
-@bot.on_message(filters.command(["saudio", "svideo"]) & filters.group)
+@bot.on_message(filters.command(["saudio", "svideo"] ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 @is_admin
 async def stream_func(_, message):
     await message.delete()
@@ -384,7 +278,7 @@ async def stream_func(_, message):
         return await m.edit(str(e))
 
 
-@bot.on_message(filters.command("skip") & filters.group)
+@bot.on_message(filters.command("skip" ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 @is_admin
 async def skip(_, message):
     await message.delete()
@@ -413,7 +307,7 @@ async def skip(_, message):
             await message.reply_text(out)
             
             
-@bot.on_message(filters.command(["playlist", "queue"]) & filters.group)
+@bot.on_message(filters.command(["playlist", "queue"] ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 @is_admin
 async def playlist(_, message):
     chat_id = message.chat.id
@@ -438,7 +332,7 @@ async def playlist(_, message):
         await message.reply_text("❗Nothing is playing.")
     
 
-@bot.on_message(filters.command("stop") & filters.group)
+@bot.on_message(filters.command("stop" ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 @is_admin
 async def end(_, message):
     await message.delete()
@@ -456,7 +350,7 @@ async def end(_, message):
         await message.reply_text("❗Nothing is playing.")
         
 
-@bot.on_message(filters.command("pause") & filters.group)
+@bot.on_message(filters.command("pause" ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 @is_admin
 async def pause(_, message):
     await message.delete()
@@ -471,7 +365,7 @@ async def pause(_, message):
         await message.reply_text("❗Nothing is playing.")
         
         
-@bot.on_message(filters.command("resume") & filters.group)
+@bot.on_message(filters.command("resume" ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 @is_admin
 async def resume(_, message):
     await message.delete()
@@ -486,7 +380,7 @@ async def resume(_, message):
         await message.reply_text("❗Nothing is playing.")
         
         
-@bot.on_message(filters.command("mute") & filters.group)
+@bot.on_message(filters.command("mute" ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 @is_admin
 async def mute(_, message):
     await message.delete()
@@ -501,7 +395,7 @@ async def mute(_, message):
         await message.reply_text("❗Nothing is playing.")
         
         
-@bot.on_message(filters.command("unmute") & filters.group)
+@bot.on_message(filters.command("unmute" ,prefixes=".") & ~filters.private & (filters.outgoing|filters.user(OWNER_ID)))
 @is_admin
 async def unmute(_, message):
     await message.delete()
@@ -516,7 +410,7 @@ async def unmute(_, message):
         await message.reply_text("❗Nothing is playing.")
         
         
-@bot.on_message(filters.command("restart"))
+@bot.on_message(filters.command("restart" ,prefixes="."))
 async def restart(_, message):
     user_id = message.from_user.id
     if user_id != OWNER_ID:
@@ -526,5 +420,5 @@ async def restart(_, message):
             
 
 app.start()
-bot.run()
+print("Started")
 idle()
