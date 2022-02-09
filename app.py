@@ -43,7 +43,7 @@ from helpers import QUEUE, add_to_queue, get_queue, clear_queue, pop_an_item, is
 # Config
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
-SESSION = os.getenv("SESSION")
+SESSION = os.getenv("SESSION_NAME")
 OWNER = os.getenv("OWNER_ID")
 OWNER_ID = [int(x) for x in OWNER.split()]
 
