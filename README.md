@@ -11,7 +11,10 @@
 - Multi chats supported
 - YouTube live links supported
 
-## Config Vars
+
+## Deploy your own bot here.
+
+### Config Vars
 
 1. `API_ID` : Assistant account Telegram API_ID, get it from my.telegram.org
 2. `API_HASH` : Assistant account Telegram API_HASH, get it from my.telegram.org
@@ -19,17 +22,9 @@
 4. `SESSION_NAME` : Pyrogram session string of assistant account
 5. `OWNER_ID` : Your Telegram ID
 
-## Deploy your own bot here.
-
 <p align="left"><a href="https://replit.com/@AaravxD/PyroStringSession#main.py"><img src="https://img.shields.io/badge/Generate%20On%20Repl-blueviolet?style=for-the-badge&logo=appveyor" width="245" alt="Repl"></a></p> 
 
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://dashboard.heroku.com/new?template=https://github.com/ImJanindu/47MusicPlayerBot)
-
-## 👀 Features
-- Fast & Powerful player
-- Queues available
-- Multi chats supported
-- YouTube live links supported
 
 ## Commands
 
